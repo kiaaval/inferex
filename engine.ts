@@ -24,35 +24,40 @@ const engine = (data: syllogism) => {
         throw new Error("Major premise is not valid (invalid word count).");
         return;
     }
-    if (premiseOne.length !== 3 && premiseOne.length !== 4) {
+    if (premiseTwo.length !== 3 && premiseTwo.length !== 4) {
         throw new Error("Minor premise is not valid (invalid word count).");
         return;
     }
-    if (premiseOne.length === 3 && premiseOne.length === 3) {
+    if (premiseOne.length === 3 && premiseTwo.length === 3) {
         throw new Error("Invalid syllogism (Two singular premises).");
         return;
     } 
 }
 
 const parser = (premise: string[]) => {
-    if (!premise[0] || !premise[2]) {
-        throw new Error("Something went wrong type parsing.");
+    if (premise.length === 0) {
+        throw new Error("Something went wrong parsing.");
         return;
     }
-    const quantifier = premise[0];
-    const qualitifier = premise[2];
-    if (!quantityKey.includes(quantifier)) {
-        throw new Error("First word is not 'all', 'some', or 'no'.");
+    const argOne = premise[0]!;
+    if (!quantityKey.includes(argOne) && premise.length !== 3) {
+        throw new Error("Something went wrong parsing.");
         return;
     }
-    if (!affirmativeKey.includes(qualitifier) && !dissentingKey.includes(qualitifier)) {
-        throw new Error("Invalid qualitifier");
+    
+    let polarity: boolean = false;
+    for (let i = 0; i < premise.length; i++) {
+        if (!premise[0]) {
+            continue;
+        }
+        const word = premise[0];
+        if (affirmativeKey.includes(word)) {
+            polarity = true;
+            break;
+        }
+    }
+    if (polarity === false) {
+        throw new Error("Couldn't identify quality.")
         return;
     }
-
-    const quality: boolean = affirmativeKey.includes(qualitifier);
-
-    const propKey = `${premise[0]}-${quality}`;
-
-    const proptype = propKey;
 }
