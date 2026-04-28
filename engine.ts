@@ -1,4 +1,4 @@
-import type { syllogism, proposition, propType, propositionKey } from "./types.js";
+import type { syllogism, proposition, propType, propositionKey, quantity, quality } from "./types.js";
 
 const propositionType: Record<propositionKey, propType> = {
     "all-true": "A",
@@ -11,7 +11,8 @@ const propositionType: Record<propositionKey, propType> = {
 
 const quantityKey = ["all", "some", "no"];
 const affirmativeKey = ["is", "are"];
-const dissentingKey = ["isnt", "arent"];
+const negativeAddOn = "not";
+const singleDissentingKey = ["isnt", "arent"];
 
 
 const engine = (data: syllogism) => {
@@ -35,6 +36,9 @@ const engine = (data: syllogism) => {
 }
 
 const parser = (premise: string[]) => {
+    let proptype: propType;
+    let quality: quality;
+    let quantity: quantity;
     if (premise.length === 0) {
         throw new Error("Something went wrong parsing.");
         return;
@@ -47,12 +51,15 @@ const parser = (premise: string[]) => {
     
     let polarity: boolean = false;
     for (let i = 0; i < premise.length; i++) {
-        if (!premise[0]) {
+        if (!premise[i]) {
             continue;
         }
-        const word = premise[0];
-        if (affirmativeKey.includes(word)) {
+        const word = premise[i]!;
+        if (affirmativeKey.includes(word) || singleDissentingKey.includes(word)) {
             polarity = true;
+            if (affirmativeKey.includes(word) && negativeAddOn.includes(word + 1)) {
+                quality = false;
+            }
             break;
         }
     }
@@ -60,4 +67,6 @@ const parser = (premise: string[]) => {
         throw new Error("Couldn't identify quality.")
         return;
     }
+
+    proptype = `${premise[0]}-${quality}`;
 }
