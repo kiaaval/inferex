@@ -1,7 +1,7 @@
 
 type propType = "A" | "E" | "I" | "O";
 type role = "major" | "minor";
-type quantity = "universal" | "particular" | "singular";
+type quantity = "all" | "some" | "no" | "singular";
 type quality = true | false;
 type propositionKey = "all-true" | "no-true" | "some-true" | "some-false" | "all-false" | "no-false";
 
@@ -13,11 +13,11 @@ type syllogism = {
 type proposition = {
     propType: propType;
     role?: role;
-    quantity: quantity
+    quantity: quantity;
     quality: quality;
     subject: string;
     predicate: string;
 }
 
 
-export type {proposition, syllogism, propType, propositionKey, quantity, quality};
+export type {proposition, syllogism, propType, propositionKey, quantity, quality };
