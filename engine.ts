@@ -187,13 +187,19 @@ const parser = (premise: string[]): proposition => {
         //assigning quality
         if (quantity !== undefined && subject !== undefined && quality === undefined) {
             if (qualityPattern.includes(premise[i]!)) {
-                if (singleDissentingKey.includes(premise[i]!) || (affirmativeKey.includes(premise[i]!) && negativeAddOn === premise[i+1])) {
+                if (singleDissentingKey.includes(premise[i]!)) {
                     quality = false;
                     continue;
-                } else {
-                    quality = true;
+                }
+
+                if (affirmativeKey.includes(premise[i]!) && negativeAddOn === premise[i+1]) {
+                    quality = false;
+                    i += 1;
                     continue;
                 }
+
+                quality = true;
+                continue;
             } else {
                 subject += ` ${premise[i]}`;
                 continue;
@@ -267,25 +273,31 @@ const syllogism = (
 
     const p1Outer: string = middleTerm === premiseOne.subject ? premiseOne.predicate : premiseOne.subject;
     const p2Outer: string = middleTerm === premiseTwo.subject ? premiseTwo.predicate : premiseTwo.subject;
+    const canPremiseOneBeMajor = premiseOne.quantity !== "singular" || premiseTwo.quantity === "singular";
+    const canPremiseTwoBeMajor = premiseTwo.quantity !== "singular" || premiseOne.quantity === "singular";
 
-    const probOnep1Order: termOrder = p1Terms[0] === middleTerm ? "m-p" : "p-m";
-    const probOnep2Order: termOrder = p2Terms[0] === middleTerm ? "m-s" : "s-m";
+    if (canPremiseOneBeMajor) {
+        const probOnep1Order: termOrder = p1Terms[0] === middleTerm ? "m-p" : "p-m";
+        const probOnep2Order: termOrder = p2Terms[0] === middleTerm ? "m-s" : "s-m";
 
-    const probOneFigure: figure = figureKey[`${probOnep1Order},${probOnep2Order}`];
+        const probOneFigure: figure = figureKey[`${probOnep1Order},${probOnep2Order}`];
 
-    const probOneMood: mood = `${premiseOne.propType}${premiseTwo.propType}-${probOneFigure}`;
-    if (validMoods.includes(probOneMood)) {
-        return { mood: probOneMood, subject: p2Outer, predicate: p1Outer, singular: singular };
+        const probOneMood: mood = `${premiseOne.propType}${premiseTwo.propType}-${probOneFigure}`;
+        if (validMoods.includes(probOneMood)) {
+            return { mood: probOneMood, subject: p2Outer, predicate: p1Outer, singular: singular };
+        }
     }
 
-    const probTwop1Order: termOrder = p1Terms[0] === middleTerm ? "m-s" : "s-m";
-    const probTwop2Order: termOrder = p2Terms[0] === middleTerm ? "m-p" : "p-m";
+    if (canPremiseTwoBeMajor) {
+        const probTwop1Order: termOrder = p1Terms[0] === middleTerm ? "m-s" : "s-m";
+        const probTwop2Order: termOrder = p2Terms[0] === middleTerm ? "m-p" : "p-m";
 
-    const probTwoFigure: figure = figureKey[`${probTwop2Order},${probTwop1Order}`];
+        const probTwoFigure: figure = figureKey[`${probTwop2Order},${probTwop1Order}`];
 
-    const probTwoMood: mood = `${premiseTwo.propType}${premiseOne.propType}-${probTwoFigure}`;
-    if (validMoods.includes(probTwoMood)) {
-        return { mood: probTwoMood, subject: p1Outer, predicate: p2Outer, singular: singular };
+        const probTwoMood: mood = `${premiseTwo.propType}${premiseOne.propType}-${probTwoFigure}`;
+        if (validMoods.includes(probTwoMood)) {
+            return { mood: probTwoMood, subject: p1Outer, predicate: p2Outer, singular: singular };
+        }
     }
 
     throw new Error("Syllogism is false.");
