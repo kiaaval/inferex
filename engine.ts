@@ -1,4 +1,7 @@
 import type { lines, proposition, propType, propositionKey, quantity, quality, termOrder, figureOrder, figure, mood, qualityText, qualityTextTypes } from "./types.js";
+import { NounInflector } from "natural/lib/natural/inflectors/index.js";
+
+const inflector = new NounInflector();
 
 const propositionType: Record<propositionKey, propType> = {
     "all-true": "A",
@@ -84,12 +87,46 @@ const IGNORE = new Set(["a", "an", "the", "of", "single"])
 
 const quantityPattern = ["all", "every", "each", "no", "none", "some", "few", "least"];
 
+const cleanWord = (word: string): string => {
+    return word
+        .toLowerCase()
+        .trim()
+        .replace(/[.,!?;:]/g, "");
+}
+
+const normalizeComparisonWord = (word: string): string => {
+    const cleaned = cleanWord(word).replace(/men$/, "man");
+    if (/[td]es$/.test(cleaned)) return cleaned; // preserve Greek/Latin proper nouns (Socrates, Thucydides, etc.)
+    return inflector.singularize(cleaned);
+}
+
+const tokenizeTerm = (term: string): string[] => {
+    return term
+        .split(/\s+/)
+        .map(cleanWord)
+        .filter(word => word.length > 0);
+}
+
+const normalizeComparisonTerm = (term: string): string => {
+    return term
+        .split(/\s+/)
+        .map(normalizeComparisonWord)
+        .filter(word => word.length > 0)
+        .join(" ");
+}
+
+const singularizeForOutput = (term: string): string => {
+    return term
+        .split(/\s+/)
+        .map(word => inflector.singularize(word))
+        .join(" ");
+}
+
 export const engine = (data: lines) => {
     const { lineOne, lineTwo } = data;
 
-    const premiseOneCheck = lineOne.trim().split(/\s+/);
-    const premiseTwoCheck = lineTwo.trim().split(/\s+/);
-
+    const premiseOneCheck = tokenizeTerm(lineOne);
+    const premiseTwoCheck = tokenizeTerm(lineTwo);
     //note to self: put premiseOneCheck and premiseTwoCheck in an array and run a for loop
     //for the array to run the code below?
     let premiseOne: proposition;
@@ -113,7 +150,7 @@ export const engine = (data: lines) => {
         throw new Error(`Line two failed to parse: ${detail}`)
     }
 
-    const { mood, subject, predicate, singular }= syllogism(premiseOne, premiseTwo);
+    const { mood, subject, predicate, singular } = syllogism(premiseOne, premiseTwo);
     const concPropType = concPropTypes[mood];
     if (!concPropType) {
         throw new Error("Something went wrong.");
@@ -144,22 +181,11 @@ const parser = (premise: string[]): proposition => {
     }
 
     //cleaner
-    for (let i = 0; i < premise.length; i++) {
-        if (IGNORE.has(premise[i]!)) {
-            premise.splice(i, 1);
-            i -= 1;
-            continue;
-        }
-        
-        let repeatQuantifier = 0;
-        for (const word of premise) {
-            if (quantityPattern.includes(word)) {
-                repeatQuantifier++;
-            }
-        }
-        if (repeatQuantifier > 1) {
-            throw new Error("Invalid premise: repeated quantifier term.");
-        }
+    premise = premise.filter(word => !IGNORE.has(word));
+    const quantifierCount = premise.filter(word => quantityPattern.includes(word)).length;
+
+    if (quantifierCount > 1) {
+        throw new Error("Invalid premise: repeated quantifier term.");
     }
 
     if (!premise.some(word => quantityPattern.includes(word))) {
@@ -258,45 +284,70 @@ const syllogism = (
     //is valid first or at all determines the correct major and minor premises which won't need to be
     //thought of since the syllogism would already be confirmed as valid or not. But it will matter to
     //send the correct outer terms to be the subject and predicate terms of the conclusion.
-    const p1Terms = [premiseOne.subject, premiseOne.predicate];
-    const p2Terms = [premiseTwo.subject, premiseTwo.predicate];
+    const p1Terms: [string, string] = [
+        premiseOne.subject,
+        premiseOne.predicate
+    ];
+    const p2Terms: [string, string] = [
+        premiseTwo.subject,
+        premiseTwo.predicate
+    ];
 
-    const middleTerm = p1Terms.find(x => p2Terms.includes(x));
+    const normalizedP1Terms: [string, string] = [
+        normalizeComparisonTerm(premiseOne.subject),
+        normalizeComparisonTerm(premiseOne.predicate)
+    ];
+    const normalizedP2Terms: [string, string] = [
+        normalizeComparisonTerm(premiseTwo.subject),
+        normalizeComparisonTerm(premiseTwo.predicate)
+    ];
+
+    const middleTerm = normalizedP1Terms.find(term => normalizedP2Terms.includes(term));
     if (!middleTerm) {
         throw new Error("Invalid syllogism: no middle term detected.");
     }
+
+    const premiseOneMiddleIndex = normalizedP1Terms.indexOf(middleTerm);
+    const premiseTwoMiddleIndex = normalizedP2Terms.indexOf(middleTerm);
 
     let singular: boolean = false;
     if (premiseOne.quantity === "singular" || premiseTwo.quantity === "singular") {
         singular = true;
     }
 
-    const p1Outer: string = middleTerm === premiseOne.subject ? premiseOne.predicate : premiseOne.subject;
-    const p2Outer: string = middleTerm === premiseTwo.subject ? premiseTwo.predicate : premiseTwo.subject;
+    const p1Outer: string = premiseOneMiddleIndex === 0 ? normalizedP1Terms[1] : normalizedP1Terms[0];
+    const p2Outer: string = premiseTwoMiddleIndex === 0 ? normalizedP2Terms[1] : normalizedP2Terms[0];
     const canPremiseOneBeMajor = premiseOne.quantity !== "singular" || premiseTwo.quantity === "singular";
     const canPremiseTwoBeMajor = premiseTwo.quantity !== "singular" || premiseOne.quantity === "singular";
 
+    const p1OuterIndex = normalizedP1Terms.indexOf(p1Outer);
+    const p2OuterIndex = normalizedP2Terms.indexOf(p2Outer);
+
     if (canPremiseOneBeMajor) {
-        const probOnep1Order: termOrder = p1Terms[0] === middleTerm ? "m-p" : "p-m";
-        const probOnep2Order: termOrder = p2Terms[0] === middleTerm ? "m-s" : "s-m";
+        const probOnep1Order: termOrder = premiseOneMiddleIndex === 0 ? "m-p" : "p-m";
+        const probOnep2Order: termOrder = premiseTwoMiddleIndex === 0 ? "m-s" : "s-m";
 
         const probOneFigure: figure = figureKey[`${probOnep1Order},${probOnep2Order}`];
 
         const probOneMood: mood = `${premiseOne.propType}${premiseTwo.propType}-${probOneFigure}`;
+
+        const predicate: string = singular ? singularizeForOutput(p1Terms[p1OuterIndex]!) : p1Terms[p1OuterIndex]!;
         if (validMoods.includes(probOneMood)) {
-            return { mood: probOneMood, subject: p2Outer, predicate: p1Outer, singular: singular };
+            return { mood: probOneMood, subject: p2Terms[p2OuterIndex]!, predicate: predicate, singular: singular };
         }
     }
 
     if (canPremiseTwoBeMajor) {
-        const probTwop1Order: termOrder = p1Terms[0] === middleTerm ? "m-s" : "s-m";
-        const probTwop2Order: termOrder = p2Terms[0] === middleTerm ? "m-p" : "p-m";
+        const probTwop1Order: termOrder = premiseOneMiddleIndex === 0 ? "m-s" : "s-m";
+        const probTwop2Order: termOrder = premiseTwoMiddleIndex === 0 ? "m-p" : "p-m";
 
         const probTwoFigure: figure = figureKey[`${probTwop2Order},${probTwop1Order}`];
 
         const probTwoMood: mood = `${premiseTwo.propType}${premiseOne.propType}-${probTwoFigure}`;
+
+        const predicate: string = singular ? singularizeForOutput(p2Terms[p2OuterIndex]!) : p2Terms[p2OuterIndex]!;
         if (validMoods.includes(probTwoMood)) {
-            return { mood: probTwoMood, subject: p1Outer, predicate: p2Outer, singular: singular };
+            return { mood: probTwoMood, subject: p1Terms[p1OuterIndex]!, predicate: predicate, singular: singular };
         }
     }
 
