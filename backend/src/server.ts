@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from "express";
 import cookieParser from 'cookie-parser';
 import { requireAuth } from './middleware/requireAuth.js';
@@ -31,6 +32,12 @@ app.use(cookieParser());
 app.use("/user", ru);
 app.use("/syllogism", requireAuth, rs);
 
-app.listen(PORT, () => {
-    console.log(`Listening on http://localhost:${PORT}`)
-});
+// On Vercel the app runs as a serverless function (see api/index.ts), where there
+// is no long-running process to listen. Only start a listener for local dev.
+if (!process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`Listening on http://localhost:${PORT}`)
+    });
+}
+
+export default app;
