@@ -5,10 +5,15 @@ import bcrypt from 'bcrypt';
 
 // Shared cookie attributes. clearCookie only clears a cookie when these match
 // the ones it was set with (excluding maxAge/expires), so we keep maxAge separate.
+// In production the frontend and backend live on different Vercel domains, so the
+// auth cookie is cross-site: it needs SameSite=None + Secure to be sent at all.
+// Locally (same-origin over http) Lax works and Secure must be off.
+const isProd = process.env.NODE_ENV === 'production';
+
 const COOKIE_OPTS = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
+    secure: isProd,
+    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
     path: '/',
 }
 
