@@ -7,10 +7,19 @@ import { ru } from './routers/userRouter.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:3000";
+// Comma-separated allowlist so the custom domain and the *.vercel.app URL can
+// both be active (e.g. during a domain switch). Credentialed CORS can't use "*",
+// so we echo back the request's origin when it's allowed.
+const ALLOWED_ORIGINS = (process.env.FRONTEND_ORIGIN || "http://localhost:3000")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
 
 app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", FRONTEND_ORIGIN);
+    const origin = req.headers.origin;
+    if (origin && ALLOWED_ORIGINS.includes(origin)) {
+        res.header("Access-Control-Allow-Origin", origin);
+    }
     res.header("Vary", "Origin");
     res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
     res.header("Access-Control-Allow-Headers", "Content-Type");
